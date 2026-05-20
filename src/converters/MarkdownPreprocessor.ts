@@ -153,6 +153,8 @@ export interface MarkdownPreprocessorConfig {
 	wikilinkConfig: WikilinkConfig;
 	/** Note title to add as H1 heading at top (optional) */
 	noteTitle?: string;
+	/** Vault-relative path of the source note (e.g. "References/My Note.md") */
+	sourceNotePath?: string;
 }
 
 /**
@@ -226,17 +228,21 @@ export class MarkdownPreprocessor {
 	private options: PreprocessorOptions;
 	private wikilinkConfig: WikilinkConfig;
 	private noteTitle?: string;
+	private sourceNoteDir: string;
 	private horizontalRuleProcessor: HorizontalRuleProcessor;
 	private frontmatterProcessor: FrontmatterProcessor;
 	private wikilinkProcessor: WikilinkProcessor;
 	private embedProcessor: EmbedProcessor;
 	private calloutProcessor: CalloutProcessor;
-	
+
 	constructor(config: MarkdownPreprocessorConfig) {
 		this.vaultPath = config.vaultPath;
 		this.options = config.options;
 		this.wikilinkConfig = config.wikilinkConfig;
 		this.noteTitle = config.noteTitle;
+		this.sourceNoteDir = config.sourceNotePath
+			? path.dirname(config.sourceNotePath)
+			: '';
 		
 		this.horizontalRuleProcessor = new HorizontalRuleProcessor();
 		
@@ -469,7 +475,15 @@ export class MarkdownPreprocessor {
 				return marker;
 			}
 
-			// Keep local images as-is for normal processing
+			// Resolve relative local image paths against the source note's directory
+			// so they become vault-relative (Pandoc runs from vault root, not the note's dir)
+			const trimmedUrl = url.trim();
+			if (this.sourceNoteDir && (trimmedUrl.startsWith('./') || trimmedUrl.startsWith('../'))) {
+				const resolved = path.posix.normalize(
+					path.posix.join(this.sourceNoteDir, trimmedUrl)
+				);
+				return `![${alt}](${resolved})`;
+			}
 			return match;
 		});
 	}

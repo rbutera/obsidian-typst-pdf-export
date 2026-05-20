@@ -177,7 +177,8 @@ export class ExportOrchestrator {
 					format: 'md',
 					extension: '.md'
 				},
-				noteTitle: file.basename
+				noteTitle: file.basename,
+				sourceNotePath: file.path
 			});
 			
 			const processedResult = preprocessor.process(content);
