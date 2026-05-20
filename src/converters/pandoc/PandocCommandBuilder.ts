@@ -304,9 +304,11 @@ export class PandocCommandBuilder {
 		args.push('--resource-path', templatesDir);
 		
 		// Typst resolves #import relative to the importing file's directory, not --resource-path
-		// (that's a Pandoc flag). The generated .typ lives at the vault root, so we need the
-		// absolute path to the template file for Typst to find it.
-		const templatePathForTypst = pathUtils.joinPath(absolutePluginDir, 'templates', path.basename(pandocOptions.template));
+		// (that's a Pandoc flag). The generated .typ lives at the vault root, so we need a
+		// real filesystem absolute path. absolutePluginDir is vault-relative despite the name,
+		// so we prepend the vault path.
+		const vaultPath = pathUtils.getVaultPath();
+		const templatePathForTypst = pathUtils.joinPath(vaultPath, absolutePluginDir, 'templates', path.basename(pandocOptions.template));
 
 		args.push('-V', `template_path=${templatePathForTypst}`);
 	}
