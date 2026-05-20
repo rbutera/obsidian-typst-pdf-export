@@ -47,7 +47,6 @@
  * for each template.
  */
 
-import * as path from 'path';
 import { PandocOptions } from '../converterTypes';
 import { TypstVariableMapper } from './TypstVariableMapper';
 import { ResourcePathResolver } from './ResourcePathResolver';
@@ -220,10 +219,9 @@ export class PandocCommandBuilder {
 		// Add enhanced Typst diagnostics for better error reporting
 		this.addTypstDiagnostics(args, pandocOptions);
 
-		// Set working directory for relative paths
-		if (pandocOptions.vaultBasePath) {
-			process.chdir(pandocOptions.vaultBasePath);
-		}
+		// NOTE: Working directory is set via `cwd` on the spawned child process
+		// in PandocExecutor. Do NOT call process.chdir() here as it mutates
+		// the global state of the Obsidian parent process.
 
 		return args;
 	}
@@ -288,8 +286,8 @@ export class PandocCommandBuilder {
 	// Use universal wrapper with --template and pass actual template as template_path variable
 	if (pandocOptions.template) {
 		const pathUtils = new PathUtils(this.plugin.app);
-		const absolutePluginDir = pandocOptions.pluginDir || '';
-		const wrapperPath = pathUtils.joinPath(absolutePluginDir, 'templates', 'universal-wrapper.pandoc.typ');
+		const pluginDir = pandocOptions.pluginDir || '';
+		const wrapperPath = pathUtils.joinPath(pluginDir, 'templates', 'universal-wrapper.pandoc.typ');
 
 		// Verify wrapper exists
 		if (!(await pathUtils.fileExists(wrapperPath))) {
@@ -298,17 +296,19 @@ export class PandocCommandBuilder {
 
 		args.push('--template', wrapperPath);
 
-		// Add plugin templates directory as a resource path so Typst can find template files
-		const templatesDir = pathUtils.joinPath(absolutePluginDir, 'templates');
-		// Path quoting handled automatically by spawn
+		// Add plugin templates directory as a resource path so Pandoc can find resources
+		const templatesDir = pathUtils.joinPath(pluginDir, 'templates');
 		args.push('--resource-path', templatesDir);
-		
-		// Typst resolves #import relative to the importing file's directory, not --resource-path
-		// (that's a Pandoc flag). The generated .typ lives at the vault root, so we need a
-		// real filesystem absolute path. absolutePluginDir is vault-relative despite the name,
-		// so we prepend the vault path.
-		const vaultPath = pathUtils.getVaultPath();
-		const templatePathForTypst = pathUtils.joinPath(vaultPath, absolutePluginDir, 'templates', path.basename(pandocOptions.template));
+
+		// Typst resolves #import paths relative to the importing file's directory.
+		// Pandoc creates the intermediate .typ file in the CWD, which is the vault root.
+		// Therefore, the template_path must be vault-relative so Typst can resolve it
+		// from the vault root directory.
+		//
+		// pandocOptions.template is an absolute path (from TemplateManager.getTemplatePath).
+		// pandocOptions.pluginDir is also absolute (from ExportOrchestrator).
+		// We strip the vault path prefix to get a vault-relative path.
+		const templatePathForTypst = pathUtils.toVaultRelative(pandocOptions.template);
 
 		args.push('-V', `template_path=${templatePathForTypst}`);
 	}
