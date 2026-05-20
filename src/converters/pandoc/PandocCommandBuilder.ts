@@ -303,17 +303,9 @@ export class PandocCommandBuilder {
 		// Path quoting handled automatically by spawn
 		args.push('--resource-path', templatesDir);
 		
-		// Pass the actual template path as a variable
-		// Use relative path from vault root for Typst import
-		let templatePathForTypst = pandocOptions.template;
-		if (path.isAbsolute(templatePathForTypst) && pandocOptions.vaultBasePath) {
-			// Make template path relative to vault for Typst import
-			templatePathForTypst = path.relative(pandocOptions.vaultBasePath, templatePathForTypst);
-		}
-
-		// Normalize to forward slashes for Typst (Typst uses forward slashes on all platforms)
-		// This prevents Windows backslashes from being interpreted as escape characters in Typst
-		templatePathForTypst = templatePathForTypst.replace(/\\/g, '/');
+		// Pass just the template filename since --resource-path points to the templates directory.
+		// Typst's #import resolves against resource paths, so the full/relative vault path is wrong.
+		let templatePathForTypst = path.basename(pandocOptions.template);
 
 		args.push('-V', `template_path=${templatePathForTypst}`);
 	}

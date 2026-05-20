@@ -340,7 +340,7 @@ export class EmbedProcessor {
 						vaultBasePath,
 						currentFile,
 						[attachmentsPath],
-						false // Don't use Obsidian API for image embeds
+						true // Use Obsidian API to resolve wiki-link image names to vault paths
 					);
 				}
 
