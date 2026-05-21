@@ -201,8 +201,9 @@ export class PandocCommandBuilder {
 		args.push('--standalone');
 
 
-		// Embed resources (images, etc.) directly into the output
-		args.push('--embed-resources');
+		// Do NOT use --embed-resources: it extracts images to a temp media-* directory
+		// with absolute paths that Typst can't resolve from the vault root. Instead,
+		// Typst finds images via their vault-relative paths since CWD is the vault root.
 
 		// Add resource paths for attachment resolution
 		await this.addResourcePaths(args, pandocOptions);
