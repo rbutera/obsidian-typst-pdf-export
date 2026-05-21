@@ -163,10 +163,16 @@ export class PandocExecutor {
 				workingDir = pluginDir;
 			}
 			
-			// Augment PATH to include common binary locations
+			// Augment PATH and force TMPDIR to match CWD.
+			// Pandoc's --pdf-engine=typst pipeline extracts media to a temp dir and
+			// writes relative paths in the generated .typ. If TMPDIR differs from CWD
+			// (common in Electron), Pandoc writes absolute TMPDIR paths that Typst
+			// can't resolve from the vault root. Setting TMPDIR=CWD ensures temp files
+			// land alongside the .typ so relative paths work.
 			const augmentedEnv = {
 				...process.env,
-				PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${process.env.PATH || ''}`
+				PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${process.env.PATH || ''}`,
+				TMPDIR: workingDir
 			};
 			
 			// Spawn pandoc process with vault as working directory for attachment resolution
