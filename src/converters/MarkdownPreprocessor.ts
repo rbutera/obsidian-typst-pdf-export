@@ -484,22 +484,15 @@ export class MarkdownPreprocessor {
 				);
 			}
 
-			// Extract Obsidian-style |size from alt text and convert to Pandoc attributes
+			// Strip Obsidian |size from alt text so it doesn't render literally
 			let cleanAlt = alt;
-			let sizeAttr = '';
-			const pipeSize = alt.match(/^(.*?)\|(\d+(?:x\d+)?)$/);
+			const pipeSize = alt.match(/^(.*?)\|\d+(?:x\d+)?$/);
 			if (pipeSize) {
 				cleanAlt = pipeSize[1];
-				const dims = pipeSize[2].match(/^(\d+)(?:x(\d+))?$/);
-				if (dims) {
-					sizeAttr = dims[2]
-						? `{width=${dims[1]}px height=${dims[2]}px}`
-						: `{width=${dims[1]}px}`;
-				}
 			}
 
-			if (resolvedUrl !== url.trim() || sizeAttr) {
-				return `![${cleanAlt}](${resolvedUrl})${sizeAttr}`;
+			if (resolvedUrl !== url.trim() || cleanAlt !== alt) {
+				return `![${cleanAlt}](${resolvedUrl})`;
 			}
 			return match;
 		});

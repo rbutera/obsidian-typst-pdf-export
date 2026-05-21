@@ -395,25 +395,7 @@ export class EmbedProcessor {
 				// Get relative path from vault base for the final image
 				const relativeImagePath = path.relative(vaultBasePath, finalImagePath);
 				
-				// Create markdown with Pandoc attribute syntax for sizing.
-				// HTML <img> tags don't convert to Typst correctly; Pandoc's
-				// native {width=Npx} attributes produce proper #image(width:) calls.
-				let imageOutput;
-				if (imageEmbed.sizeOrAlt) {
-					const sizeMatch = imageEmbed.sizeOrAlt.match(/^(\d+)(?:x(\d+))?$/);
-					if (sizeMatch) {
-						const width = sizeMatch[1];
-						const height = sizeMatch[2];
-						const attrs = height
-							? `{width=${width}px height=${height}px}`
-							: `{width=${width}px}`;
-						imageOutput = `![${imageEmbed.baseName}](${relativeImagePath})${attrs}`;
-					} else {
-						imageOutput = `![${imageEmbed.sizeOrAlt}](${relativeImagePath})`;
-					}
-				} else {
-					imageOutput = `![${imageEmbed.baseName}](${relativeImagePath})`;
-				}
+				const imageOutput = `![${imageEmbed.baseName}](${relativeImagePath})`;
 				
 				updatedContent = updatedContent.replace(imageEmbed.marker, imageOutput);
 				
