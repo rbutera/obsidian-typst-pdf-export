@@ -477,12 +477,29 @@ export class MarkdownPreprocessor {
 
 			// Resolve relative local image paths against the source note's directory
 			// so they become vault-relative (Pandoc runs from vault root, not the note's dir)
-			const trimmedUrl = url.trim();
-			if (this.sourceNoteDir && (trimmedUrl.startsWith('./') || trimmedUrl.startsWith('../'))) {
-				const resolved = path.posix.normalize(
-					path.posix.join(this.sourceNoteDir, trimmedUrl)
+			let resolvedUrl = url.trim();
+			if (this.sourceNoteDir && (resolvedUrl.startsWith('./') || resolvedUrl.startsWith('../'))) {
+				resolvedUrl = path.posix.normalize(
+					path.posix.join(this.sourceNoteDir, resolvedUrl)
 				);
-				return `![${alt}](${resolved})`;
+			}
+
+			// Extract Obsidian-style |size from alt text and convert to Pandoc attributes
+			let cleanAlt = alt;
+			let sizeAttr = '';
+			const pipeSize = alt.match(/^(.*?)\|(\d+(?:x\d+)?)$/);
+			if (pipeSize) {
+				cleanAlt = pipeSize[1];
+				const dims = pipeSize[2].match(/^(\d+)(?:x(\d+))?$/);
+				if (dims) {
+					sizeAttr = dims[2]
+						? `{width=${dims[1]}px height=${dims[2]}px}`
+						: `{width=${dims[1]}px}`;
+				}
+			}
+
+			if (resolvedUrl !== url.trim() || sizeAttr) {
+				return `![${cleanAlt}](${resolvedUrl})${sizeAttr}`;
 			}
 			return match;
 		});

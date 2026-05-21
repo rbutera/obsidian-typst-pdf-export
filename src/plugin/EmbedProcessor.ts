@@ -344,6 +344,7 @@ export class EmbedProcessor {
 					);
 				}
 
+				console.warn(`Export: Image resolve: "${decodedPath}" → ${fullImagePath || 'NOT FOUND'}`);
 				if (!fullImagePath) {
 					console.warn(`Export: Image file not found: ${decodedPath}`);
 					// Keep the original marker or replace with placeholder
@@ -394,27 +395,23 @@ export class EmbedProcessor {
 				// Get relative path from vault base for the final image
 				const relativeImagePath = path.relative(vaultBasePath, finalImagePath);
 				
-				// Create the appropriate markdown output based on size/alt text
+				// Create markdown with Pandoc attribute syntax for sizing.
+				// HTML <img> tags don't convert to Typst correctly; Pandoc's
+				// native {width=Npx} attributes produce proper #image(width:) calls.
 				let imageOutput;
 				if (imageEmbed.sizeOrAlt) {
-					// Check if it's size information (width x height pattern)
 					const sizeMatch = imageEmbed.sizeOrAlt.match(/^(\d+)(?:x(\d+))?$/);
 					if (sizeMatch) {
 						const width = sizeMatch[1];
 						const height = sizeMatch[2];
-						
-						// Create image with size attributes (optimized for Pandoc → Typst conversion)
-						if (height) {
-							imageOutput = `<img src="${relativeImagePath}" width="${width}" height="${height}" alt="${imageEmbed.baseName}" />`;
-						} else {
-							imageOutput = `<img src="${relativeImagePath}" width="${width}" alt="${imageEmbed.baseName}" />`;
-						}
+						const attrs = height
+							? `{width=${width}px height=${height}px}`
+							: `{width=${width}px}`;
+						imageOutput = `![${imageEmbed.baseName}](${relativeImagePath})${attrs}`;
 					} else {
-						// Treat as alt text
 						imageOutput = `![${imageEmbed.sizeOrAlt}](${relativeImagePath})`;
 					}
 				} else {
-					// Standard image reference
 					imageOutput = `![${imageEmbed.baseName}](${relativeImagePath})`;
 				}
 				
