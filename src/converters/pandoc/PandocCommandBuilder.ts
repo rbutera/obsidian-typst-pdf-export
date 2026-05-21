@@ -193,17 +193,16 @@ export class PandocCommandBuilder {
 		// Specify input format as markdown with smart extension disabled
 		args.push('--from', 'markdown-smart');
 
-		// Set PDF engine to Typst (use configured path if available)
-		const typstPath = this.pathResolver.resolveExecutablePath(pandocOptions.typstPath, 'typst');
-		args.push(`--pdf-engine=${typstPath}`);
+		const isTypstOutput = outputPath.endsWith('.typ');
 
-		// Enable standalone mode (required for PDF output)
+		if (!isTypstOutput) {
+			// Direct PDF output via Pandoc's engine (legacy path)
+			const typstPath = this.pathResolver.resolveExecutablePath(pandocOptions.typstPath, 'typst');
+			args.push(`--pdf-engine=${typstPath}`);
+		}
+
+		// Enable standalone mode (required for complete output)
 		args.push('--standalone');
-
-
-		// Do NOT use --embed-resources: it extracts images to a temp media-* directory
-		// with absolute paths that Typst can't resolve from the vault root. Instead,
-		// Typst finds images via their vault-relative paths since CWD is the vault root.
 
 		// Add resource paths for attachment resolution
 		await this.addResourcePaths(args, pandocOptions);
@@ -214,8 +213,10 @@ export class PandocCommandBuilder {
 		// Add all variables using the variable mapper
 		this.addTypstVariables(args, pandocOptions);
 
-		// Add Typst engine options
-		this.addTypstEngineOptions(args, pandocOptions);
+		// Add Typst engine options (only relevant for direct PDF output)
+		if (!isTypstOutput) {
+			this.addTypstEngineOptions(args, pandocOptions);
+		}
 
 		// Add enhanced Typst diagnostics for better error reporting
 		this.addTypstDiagnostics(args, pandocOptions);

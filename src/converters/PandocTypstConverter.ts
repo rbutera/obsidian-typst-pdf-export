@@ -19,9 +19,11 @@ import type { obsidianTypstPDFExport } from '../../main';
 import { TempDirectoryManager } from '../core/TempDirectoryManager';
 import { PathUtils } from '../core/PathUtils';
 import { promises as fs } from 'fs';
+import { spawn } from 'child_process';
 
 import { PandocCommandBuilder } from './pandoc/PandocCommandBuilder';
 import { PandocExecutor } from './pandoc/PandocExecutor';
+import { PathResolver } from '../plugin/PathResolver';
 
 /**
  * Main converter class for Markdown → Typst → PDF conversion.
@@ -165,31 +167,80 @@ export class PandocTypstConverter {
 
 			// Create temporary directory if needed
 			await this.ensureTempDirectory();
-			
-			// Add temp directory to pandocOptions for command builder
+
+			// Two-stage pipeline: Pandoc → .typ → Typst → .pdf
+			// Pandoc's --pdf-engine=typst pipeline extracts media to a temp dir with
+			// absolute paths that Typst can't resolve. By generating .typ first and
+			// running Typst separately, image paths stay vault-relative and resolve
+			// correctly from the vault root.
+
+			// Stage 1: Pandoc generates .typ (no media extraction)
+			const typstIntermediatePath = inputPath.replace(/\.md$/, '') + '-intermediate.typ';
+
 			const optionsWithTempDir = {
 				...this.pandocOptions,
 				tempDir: this.tempDir || undefined,
 				typstSettings: this.typstSettings,
 				cleanupHandlers: this.cleanupHandlers
 			};
-			
-			// Build pandoc arguments
-			const args = await this.commandBuilder.buildPandocArgs(inputPath, outputPath, optionsWithTempDir);
-			
-			progressCallback?.('Executing Pandoc with Typst engine...', 30);
-			
-			// Execute pandoc process
-			const result = await this.pandocExecutor.executePandoc(args, this.pandocOptions, progressCallback);
-			
-			// Add the output path to the result if successful
-			if (result.success) {
-				result.outputPath = outputPath;
+
+			const pandocArgs = await this.commandBuilder.buildPandocArgs(inputPath, typstIntermediatePath, optionsWithTempDir);
+
+			progressCallback?.('Generating Typst markup via Pandoc...', 20);
+
+			const pandocResult = await this.pandocExecutor.executePandoc(pandocArgs, this.pandocOptions, progressCallback);
+
+			if (!pandocResult.success) {
+				return pandocResult;
+			}
+
+			// Stage 2: Typst compiles .typ → .pdf
+			progressCallback?.('Compiling PDF via Typst...', 70);
+
+			const pathResolver = new PathResolver(this.plugin);
+			const typstPath = pathResolver.resolveExecutablePath(
+				this.pandocOptions.typstPath, 'typst'
+			);
+			const vaultRoot = this.pandocOptions.vaultBasePath || process.cwd();
+
+			const typstResult = await new Promise<ConversionResult>((resolve) => {
+				const typstProcess = spawn(typstPath, [
+					'compile', typstIntermediatePath, outputPath
+				], {
+					cwd: vaultRoot,
+					env: {
+						...process.env,
+						PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${process.env.PATH || ''}`
+					}
+				});
+
+				let stderr = '';
+				typstProcess.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
+				typstProcess.on('close', (code: number) => {
+					if (code === 0) {
+						resolve({ success: true, outputPath });
+					} else {
+						resolve({ success: false, error: stderr || `Typst exited with code ${code}` });
+					}
+				});
+				typstProcess.on('error', (err: Error) => {
+					resolve({ success: false, error: `Failed to run Typst: ${err.message}` });
+				});
+			});
+
+			// Cleanup intermediate .typ file
+			try {
+				await fs.unlink(typstIntermediatePath);
+			} catch {
+				// ignore cleanup failure
+			}
+
+			if (typstResult.success) {
 				progressCallback?.('Conversion complete!', 100);
 			}
 
-			return result;
-			
+			return typstResult;
+
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			return {
