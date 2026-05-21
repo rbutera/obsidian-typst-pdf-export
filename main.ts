@@ -48,7 +48,7 @@ export class obsidianTypstPDFExport extends Plugin {
 	}
 	
 	async onload() {
-		console.warn('[typst-pdf-export] rbutera-fork build 9');
+		console.warn('[typst-pdf-export] rbutera-fork build 10');
 		// Initialize lifecycle manager
 		this.lifecycle = new PluginLifecycle(this);
 		

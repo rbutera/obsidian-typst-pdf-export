@@ -174,8 +174,13 @@ export class PandocTypstConverter {
 			// running Typst separately, image paths stay vault-relative and resolve
 			// correctly from the vault root.
 
-			// Stage 1: Pandoc generates .typ (no media extraction)
-			const typstIntermediatePath = inputPath.replace(/\.md$/, '') + '-intermediate.typ';
+			// Stage 1: Pandoc generates .typ in vault root (not temp-pandoc)
+			// so Typst resolves relative imports (.obsidian/plugins/.../templates/default.typ) correctly
+			const vaultRoot = this.pandocOptions.vaultBasePath || process.cwd();
+			const pathUtils = new PathUtils(this.plugin.app);
+			const typstIntermediatePath = pathUtils.joinPath(
+				vaultRoot, `typst-export-${Date.now()}.typ`
+			);
 
 			const optionsWithTempDir = {
 				...this.pandocOptions,
@@ -197,11 +202,10 @@ export class PandocTypstConverter {
 			// Stage 2: Typst compiles .typ → .pdf
 			progressCallback?.('Compiling PDF via Typst...', 70);
 
-			const pathResolver = new PathResolver(this.plugin);
-			const typstPath = pathResolver.resolveExecutablePath(
+			const typstPathResolver = new PathResolver(this.plugin);
+			const typstPath = typstPathResolver.resolveExecutablePath(
 				this.pandocOptions.typstPath, 'typst'
 			);
-			const vaultRoot = this.pandocOptions.vaultBasePath || process.cwd();
 
 			const typstResult = await new Promise<ConversionResult>((resolve) => {
 				const typstProcess = spawn(typstPath, [
