@@ -395,7 +395,19 @@ export class EmbedProcessor {
 				// Get relative path from vault base for the final image
 				const relativeImagePath = path.relative(vaultBasePath, finalImagePath);
 				
-				const imageOutput = `![${imageEmbed.baseName}](${relativeImagePath})`;
+				let sizeAttr = '';
+				if (imageEmbed.sizeOrAlt) {
+					const sizeMatch = imageEmbed.sizeOrAlt.match(/^(\d+)(?:x(\d+))?$/);
+					if (sizeMatch) {
+						sizeAttr = sizeMatch[2]
+							? `{width=${sizeMatch[1]}px height=${sizeMatch[2]}px}`
+							: `{width=${sizeMatch[1]}px}`;
+					}
+				}
+				const altText = (imageEmbed.sizeOrAlt && !/^\d+(?:x\d+)?$/.test(imageEmbed.sizeOrAlt))
+					? imageEmbed.sizeOrAlt
+					: imageEmbed.baseName;
+				const imageOutput = `![${altText}](${relativeImagePath})${sizeAttr}`;
 				
 				updatedContent = updatedContent.replace(imageEmbed.marker, imageOutput);
 				
